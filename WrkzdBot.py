@@ -42,7 +42,7 @@ async def on_member_join(member):
         await msg.add_reaction(EMOJI_OK_BOX)
         msg = await botReactChan.send("{0.mention} Please re-act OK in this message within 60s. Otherwise, we will consider you as bot and remove you from WrkzCoin server. You can also re-act on my DM.".format(member))
         await msg.add_reaction(EMOJI_OK_BOX)
-    except (discord.Forbidden, discord.errors.Forbidden) as e:   
+    except (discord.Forbidden, discord.errors.Forbidden) as e:
         pass
     
     def check(reaction, user):
@@ -53,10 +53,19 @@ async def on_member_join(member):
     except asyncio.TimeoutError:
         to_send = '{0.mention} (`{1.id}`) has been removed from {2.name}! No responding on OK emoji.'.format(member, member, member.guild)
         await botLogChan.send(to_send)
+        try:
+            await member.send("You have been removed from WrkzCoin because of timeout on re-action OK. Sorry for this inconvenience.")
+        except asyncio.TimeoutError:
+            pass
         await member.guild.kick(member)
     else:
         # check if user re-act
-        await botReactChan.send("Thank you {0.mention} for verification.".format(member))
+        try:
+            await botReactChan.send("Thank you {0.mention} for verification.".format(member))
+            await member.send("Thank you {0.mention} for verification.".format(member))
+        except (discord.Forbidden, discord.errors.Forbidden) as e:
+            pass
+
 
 @bot.event
 async def on_member_remove(member):
