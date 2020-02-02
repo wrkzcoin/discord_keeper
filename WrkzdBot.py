@@ -51,7 +51,7 @@ async def on_member_join(member):
     try:
         reaction, user =  await bot.wait_for('reaction_add', timeout=60, check=check)
     except asyncio.TimeoutError:
-        to_send = '{0.mention} (`{1.id}`) has been removed from {1.name}! No responding on OK emoji.'.format(member, member, member.guild)
+        to_send = '{0.mention} (`{1.id}`) has been removed from {2.name}! No responding on OK emoji.'.format(member, member, member.guild)
         await botLogChan.send(to_send)
         await member.guild.kick(member)
     else:
