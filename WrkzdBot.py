@@ -33,9 +33,9 @@ async def on_member_join(member):
     botReactChan = bot.get_channel(id=config.discord.CaptchaChanID)
     account_created = member.created_at
     if (datetime.utcnow() - account_created).total_seconds() >= 7200:
-        to_send = '{0.mention} (`{}`) has joined {1.name}!'.format(member, member.id, member.guild)
+        to_send = '{0.mention} (`{1.id}`) has joined {2.name}!'.format(member, member, member.guild)
     else:
-        to_send = '{0.mention} (`{1.id}`) has joined {2.name}! **Warning!!!**, {3.mention} just created his/her account less than 2hr.'.format(member, member.guild, member, member)
+        to_send = '{0.mention} (`{1.id}`) has joined {2.name}! **Warning!!!**, {3.mention} just created his/her account less than 2hr.'.format(member, member, member.guild, member)
     await botLogChan.send(to_send)
     try:
         msg = await member.send("{0.mention} Please re-act OK in this message within 60s. Otherwise, we will consider you as bot and remove you from WrkzCoin server. You can re-act also on my public mention message.".format(member))
@@ -70,7 +70,7 @@ async def on_member_join(member):
 @bot.event
 async def on_member_remove(member):
     botLogChan = bot.get_channel(id=config.discord.channelID)
-    to_send = '{0.mention} has left {1.name}!'.format(member, member.guild)
+    to_send = '{0.mention} (`{1.name}`) has left {2.name}!'.format(member, member, member.guild)
     await botLogChan.send(to_send)
 
 
