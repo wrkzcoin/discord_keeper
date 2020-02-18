@@ -29,27 +29,30 @@ async def on_ready():
 @bot.event
 async def on_member_join(member):
     EMOJI_OK_BOX = "\U0001F197"
+    EMOJI_OK_HAND = "\U0001F44C"
     botLogChan = bot.get_channel(id=config.discord.channelID)
     botReactChan = bot.get_channel(id=config.discord.CaptchaChanID)
     account_created = member.created_at
+    time_out_react = 60
     if (datetime.utcnow() - account_created).total_seconds() >= 7200:
+        time_out_react = 5*60
         to_send = '{0.mention} (`{1.id}`) has joined {2.name}!'.format(member, member, member.guild)
     else:
         to_send = '{0.mention} (`{1.id}`) has joined {2.name}! **Warning!!!**, {3.mention} just created his/her account less than 2hr.'.format(member, member, member.guild, member)
     await botLogChan.send(to_send)
     try:
-        msg = await member.send("{0.mention} Please re-act OK in this message within 60s. Otherwise, we will consider you as bot and remove you from WrkzCoin server. You can re-act also on my public mention message.".format(member))
+        msg = await member.send("{} Please re-act OK in this message within {}s. Otherwise, we will consider you as bot and remove you from WrkzCoin server. You can re-act also on my public mention message.".format(member.mention, time_out_react))
         await msg.add_reaction(EMOJI_OK_BOX)
-        msg = await botReactChan.send("{0.mention} Please re-act OK in this message within 60s. Otherwise, we will consider you as bot and remove you from WrkzCoin server. You can also re-act on my DM.".format(member))
+        msg = await botReactChan.send("{} Please re-act OK in this message within {}s. Otherwise, we will consider you as bot and remove you from WrkzCoin server. You can also re-act on my DM.".format(member.mention, time_out_react))
         await msg.add_reaction(EMOJI_OK_BOX)
     except (discord.Forbidden, discord.errors.Forbidden) as e:
         pass
     
     def check(reaction, user):
-        return user == member and reaction.emoji == EMOJI_OK_BOX and reaction.message.author == bot.user
+        return user == member and (reaction.emoji == EMOJI_OK_BOX or reaction.emoji == EMOJI_OK_HAND)and reaction.message.author == bot.user
 
     try:
-        reaction, user =  await bot.wait_for('reaction_add', timeout=60, check=check)
+        reaction, user =  await bot.wait_for('reaction_add', timeout=time_out_react, check=check)
     except asyncio.TimeoutError:
         to_send = '{0.mention} (`{1.id}`) has been removed from {2.name}! No responding on OK emoji.'.format(member, member, member.guild)
         await botLogChan.send(to_send)
