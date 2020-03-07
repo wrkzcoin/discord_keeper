@@ -10,6 +10,8 @@ import click
 import sys, traceback
 import asyncio
 
+WORD_FILTER = ["libra", "http"]
+
 bot = AutoShardedBot(command_prefix=['.', '!', '?'], case_insensitive=True)
 bot.remove_command("help")
 
@@ -26,6 +28,28 @@ async def on_ready():
     game = discord.Game(name="Watching Human!!!")
     await bot.change_presence(status=discord.Status.online, activity=game)
 
+
+@bot.event
+async def on_message(message):
+    global WORD_FILTER
+    botLogChan = bot.get_channel(id=config.discord.channelID)
+    if any(word.lower() in message.content.lower() for word in WORD_FILTER):
+        member = message.author
+        account_created = member.created_at
+        account_joined = member.joined_at
+        if (datetime.utcnow() - account_joined).total_seconds() < 2*3600 or \
+        (datetime.utcnow() - account_created).total_seconds() < 2*3600:
+            # If just joined and post filtered word
+            try:
+                await message.delete()
+                to_send = '{0.mention} (`{1.id}`) has been removed from {2.name}! Spammer / Scammer!'.format(member, member, member.guild)
+                await member.send(to_send)
+                await member.guild.kick(member)
+                await botLogChan.send(to_send)
+            except Exception as e:
+                print(e)
+
+
 @bot.event
 async def on_member_join(member):
     EMOJI_OK_BOX = "\U0001F197"
@@ -41,9 +65,9 @@ async def on_member_join(member):
         to_send = '{0.mention} (`{1.id}`) has joined {2.name}! **Warning!!!**, {3.mention} just created his/her account less than 2hr.'.format(member, member, member.guild, member)
     await botLogChan.send(to_send)
     try:
-        msg = await member.send("{} Please re-act OK in this message within {}s. Otherwise, we will consider you as bot and remove you from WrkzCoin server. You can re-act also on my public mention message.".format(member.mention, time_out_react))
+        msg = await member.send("{} Please re-act OK in this message within {}s. Otherwise, we will consider you as bot and remove you from {} server. You can re-act also on my public mention message.".format(member.mention, time_out_react, member.guild.name))
         await msg.add_reaction(EMOJI_OK_BOX)
-        msg = await botReactChan.send("{} Please re-act OK in this message within {}s. Otherwise, we will consider you as bot and remove you from WrkzCoin server. You can also re-act on my DM.".format(member.mention, time_out_react))
+        msg = await botReactChan.send("{} Please re-act OK in this message within {}s. Otherwise, we will consider you as bot and remove you from {} server. You can also re-act on my DM.".format(member.mention, time_out_react, member.guild.name))
         await msg.add_reaction(EMOJI_OK_BOX)
     except (discord.Forbidden, discord.errors.Forbidden) as e:
         pass
@@ -57,7 +81,7 @@ async def on_member_join(member):
         to_send = '{0.mention} (`{1.id}`) has been removed from {2.name}! No responding on OK emoji.'.format(member, member, member.guild)
         await botLogChan.send(to_send)
         try:
-            await member.send("You have been removed from WrkzCoin because of timeout on re-action OK. Sorry for this inconvenience.")
+            await member.send("You have been removed from {} because of timeout on re-action OK. Sorry for this inconvenience.".format(member.guild.name))
         except asyncio.TimeoutError:
             pass
         await member.guild.kick(member)
