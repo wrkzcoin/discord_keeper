@@ -78,13 +78,16 @@ async def on_member_join(member):
     try:
         reaction, user =  await bot.wait_for('reaction_add', timeout=time_out_react, check=check)
     except asyncio.TimeoutError:
-        to_send = '{0.mention} (`{1.id}`) has been removed from {2.name}! No responding on OK emoji.'.format(member, member, member.guild)
-        await botLogChan.send(to_send)
-        try:
-            await member.send("You have been removed from {} because of timeout on re-action OK. Sorry for this inconvenience.".format(member.guild.name))
-        except asyncio.TimeoutError:
-            pass
-        await member.guild.kick(member)
+        # get user, they might left or got kicked from spamming before timeout
+        get_member = bot.get_user(id=member.id)
+        if get_member:
+            to_send = '{0.mention} (`{1.id}`) has been removed from {2.name}! No responding on OK emoji.'.format(member, member, member.guild)
+            await botLogChan.send(to_send)
+            try:
+                await member.send("You have been removed from {} because of timeout on re-action OK. Sorry for this inconvenience.".format(member.guild.name))
+            except asyncio.TimeoutError:
+                pass
+            await member.guild.kick(member)
     else:
         # check if user re-act
         try:
