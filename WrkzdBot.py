@@ -10,7 +10,7 @@ import click
 import sys, traceback
 import asyncio
 
-WORD_FILTER = ["libra", "http"]
+WORD_FILTER = ["libra", "http", "cheap", "buy", "fаcebook", "imgur", "website", "tweet", "twit", ".net", ".com", ".io", ".org", ".gq"]
 
 bot = AutoShardedBot(command_prefix=['.', '!', '?'], case_insensitive=True)
 bot.remove_command("help")
