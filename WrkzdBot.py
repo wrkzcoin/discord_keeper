@@ -11,6 +11,7 @@ import sys, traceback
 import asyncio
 
 WORD_FILTER = ["libra", "http", "cheap", "buy", "fаcebook", "imgur", "website", "tweet", "twit", ".net", ".com", ".io", ".org", ".gq"]
+NAME_FILTER = ["_bot", "giveaway", "glveaway", "give_away", "b0t"]
 
 bot = AutoShardedBot(command_prefix=['.', '!', '?'], case_insensitive=True)
 bot.remove_command("help")
@@ -52,18 +53,32 @@ async def on_message(message):
 
 @bot.event
 async def on_member_join(member):
+    global NAME_FILTER
     EMOJI_OK_BOX = "\U0001F197"
     EMOJI_OK_HAND = "\U0001F44C"
     botLogChan = bot.get_channel(id=config.discord.channelID)
     botReactChan = bot.get_channel(id=config.discord.CaptchaChanID)
     account_created = member.created_at
-    time_out_react = 60
+    time_out_react = 30
+
     if (datetime.utcnow() - account_created).total_seconds() >= 7200:
         time_out_react = 5*60
         to_send = '{0.mention} (`{1.id}`) has joined {2.name}!'.format(member, member, member.guild)
     else:
         to_send = '{0.mention} (`{1.id}`) has joined {2.name}! **Warning!!!**, {3.mention} just created his/her account less than 2hr.'.format(member, member, member.guild, member)
     await botLogChan.send(to_send)
+
+    # if name contain name filter.
+    if any(word.lower() in member.name.lower() for word in NAME_FILTER):
+        try:
+            msg = await member.send("{} Your name is in filtered list in {}. We remove you from {} server. Sorry for this inconvenience.".format(member.mention, member.guild.name, member.guild.name))
+        except (discord.Forbidden, discord.errors.Forbidden) as e:
+            pass
+        await member.guild.kick(member)
+        to_send = '{0.mention} (`{1.id}`) has been removed from {2.name}! Filtered name matched.'.format(member, member, member.guild)
+        await botLogChan.send(to_send)
+        return
+
     try:
         msg = await member.send("{} Please re-act OK in this message within {}s. Otherwise, we will consider you as bot and remove you from {} server. You can re-act also on my public mention message.".format(member.mention, time_out_react, member.guild.name))
         await msg.add_reaction(EMOJI_OK_BOX)
