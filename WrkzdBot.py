@@ -9,6 +9,17 @@ from config import config
 import click
 import sys, traceback
 import asyncio
+# redis
+import redis
+
+redis_pool = None
+redis_conn = None
+
+def init():
+    global redis_pool
+    print("PID %d: initializing redis pool..." % os.getpid())
+    redis_pool = redis.ConnectionPool(host='localhost', port=6379, decode_responses=True, db=0)
+
 
 WORD_FILTER = ["libra", "http", "cheap", "buy", "fаcebook", "imgur", "website", "tweet", "twit", ".net", ".com", ".io", ".org", ".gq"]
 NAME_FILTER = ["_bot", "giveaway", "glveaway", "give_away", "b0t"]
@@ -53,18 +64,40 @@ async def on_message(message):
 
 @bot.event
 async def on_member_join(member):
-    global NAME_FILTER
+    global NAME_FILTER, redis_pool, redis_conn
+    time_out_react = 30
+    last_30s_join = 1
+    if redis_conn is None:
+        try:
+            redis_conn = redis.Redis(connection_pool=redis_pool)
+        except Exception as e:
+            traceback.print_exc(file=sys.stdout)
+    if redis_conn.exists('WrkzdBot_30s'):
+        last_30s_join = int(redis_conn.get('WrkzdBot_30s'))
+        last_30s_join += 1
+        redis_conn.set('WrkzdBot_30s', str(last_30s_join), ex=30)
+    else:
+        try:
+            redis_conn.set('WrkzdBot_30s', str(last_30s_join), ex=30)
+        except Exception as e:
+            traceback.print_exc(file=sys.stdout)
+
+    if last_30s_join >= 7:
+        time_out_react = 5   
+    elif last_30s_join >= 5:
+        time_out_react = 10
+    else:
+        time_out_react = 5*60
     EMOJI_OK_BOX = "\U0001F197"
     EMOJI_OK_HAND = "\U0001F44C"
     botLogChan = bot.get_channel(id=config.discord.channelID)
     botReactChan = bot.get_channel(id=config.discord.CaptchaChanID)
     account_created = member.created_at
-    time_out_react = 30
 
     if (datetime.utcnow() - account_created).total_seconds() >= 7200:
-        time_out_react = 5*60
         to_send = '{0.mention} (`{1.id}`) has joined {2.name}!'.format(member, member, member.guild)
     else:
+        if time_out_react >=30:  time_out_react = 30
         to_send = '{0.mention} (`{1.id}`) has joined {2.name}! **Warning!!!**, {3.mention} just created his/her account less than 2hr.'.format(member, member, member.guild, member)
     await botLogChan.send(to_send)
 
