@@ -230,7 +230,21 @@ async def randmsg(ctx, cmd: str, *, message: str=None):
     elif cmd == "LS" or cmd == "LIST":
         keys = redis_conn.keys("WrkzdBotMsg:*")
         # print(msgs) # [b'WrkzdBotMsg:CLBACSCZ']
-        if len(keys) > 0:
+        if len(keys) > 10:
+            response_txt = ''
+            i = 0
+            for each in keys:
+                response_txt += "**{}**: {}\n".format(each.decode('utf-8').replace('WrkzdBotMsg:', ''), redis_conn.get(each.decode('utf-8')).decode('utf-8'))
+                i += 1
+                j = 1
+                if i % 10 == 0:
+                    await ctx.send(f'{ctx.author.mention} List messages **[{j}]**:\n{response_txt}')
+                    response_txt = ''
+                    j += 1
+            if len(response_txt) > 0:
+                await ctx.send(f'{ctx.author.mention} List messages **[Last]**:\n{response_txt}')
+            return
+        elif len(keys) > 0:
             response_txt = ''
             for each in keys:
                 response_txt += "**{}**: {}\n".format(each.decode('utf-8').replace('WrkzdBotMsg:', ''), redis_conn.get(each.decode('utf-8')).decode('utf-8'))
