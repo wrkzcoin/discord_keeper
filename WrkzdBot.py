@@ -12,8 +12,16 @@ import asyncio
 # redis
 import redis
 
+import random
+import string
+
 redis_pool = None
 redis_conn = None
+
+def randomString(stringLength=8):
+    letters = string.ascii_lowercase
+    return ''.join(random.choice(letters) for i in range(stringLength))
+
 
 def init():
     global redis_pool
@@ -24,12 +32,14 @@ def init():
 WORD_FILTER = ["libra", "http", "cheap", "buy", "fаcebook", "imgur", "website", "tweet", "twit", ".net", ".com", ".io", ".org", ".gq"]
 NAME_FILTER = ["_bot", "giveaway", "glveaway", "give_away", "b0t"]
 
-bot = AutoShardedBot(command_prefix=['.', '!', '?'], case_insensitive=True)
+bot = AutoShardedBot(command_prefix=['.', '!', '?'], case_insensitive=True, owner_id = config.discord.ownerID)
 bot.remove_command("help")
+
 
 @bot.event
 async def on_shard_ready(shard_id):
     print(f'Shard {shard_id} connected')
+
 
 @bot.event
 async def on_ready():
@@ -46,20 +56,26 @@ async def on_message(message):
     global WORD_FILTER
     botLogChan = bot.get_channel(id=config.discord.channelID)
     if any(word.lower() in message.content.lower() for word in WORD_FILTER):
-        member = message.author
-        account_created = member.created_at
-        account_joined = member.joined_at
-        if (datetime.utcnow() - account_joined).total_seconds() < 2*3600 or \
-        (datetime.utcnow() - account_created).total_seconds() < 2*3600:
-            # If just joined and post filtered word
-            try:
-                await message.delete()
-                to_send = '{0.mention} (`{1.id}`) has been removed from {2.name}! Spammer / Scammer!'.format(member, member, member.guild)
-                await member.send(to_send)
-                await member.guild.kick(member)
-                await botLogChan.send(to_send)
-            except Exception as e:
-                print(e)
+        try:
+            member = message.author
+            account_created = member.created_at
+            account_joined = member.joined_at
+            if (datetime.utcnow() - account_joined).total_seconds() < 2*3600 or \
+            (datetime.utcnow() - account_created).total_seconds() < 2*3600:
+                # If just joined and post filtered word
+                try:
+                    await message.delete()
+                    to_send = '{0.mention} (`{1.id}`) has been removed from {2.name}! Spammer / Scammer!'.format(member, member, member.guild)
+                    await member.send(to_send)
+                    await member.guild.kick(member)
+                    await botLogChan.send(to_send)
+                except Exception as e:
+                    traceback.print_exc(file=sys.stdout)
+        except Exception as e:
+            traceback.print_exc(file=sys.stdout)
+    # Do not remove this, otherwise, command not working.
+    ctx = await bot.get_context(message)
+    await bot.invoke(ctx)
 
 
 @bot.event
@@ -152,8 +168,82 @@ async def on_member_remove(member):
     await botLogChan.send(to_send)
 
 
+async def posting_tips():
+    global redis_pool, redis_conn
+    await bot.wait_until_ready()
+    NewsChan = bot.get_channel(id=config.randomMsg.channelNews)
+    while not bot.is_closed():
+        if redis_conn is None:
+            try:
+                redis_conn = redis.Redis(connection_pool=redis_pool)
+            except Exception as e:
+                traceback.print_exc(file=sys.stdout)
+        while NewsChan is None:
+            NewsChan = bot.get_channel(id=config.randomMsg.channelNews)
+            await asyncio.sleep(1000)
+        keys = redis_conn.keys("WrkzdBotMsg:*")
+        if len(keys) > 0:
+            response_txt = ''
+            key = random.choice(keys)
+            response_txt += "{}".format(redis_conn.get(key.decode('utf-8')).decode('utf-8'))
+            await NewsChan.send(response_txt)
+        print("Waiting for another {}".format(config.randomMsg.duration_each))
+        await asyncio.sleep(config.randomMsg.duration_each)
+        print("Completed waiting...")      
+
+
+@bot.command(pass_context=True, name='randmsg',  aliases=['random_message'])
+async def randmsg(ctx, cmd: str, *, message: str=None):
+    global redis_pool, redis_conn
+    if ctx.message.author.id != config.discord.ownerID:
+        return
+    if redis_conn is None:
+        try:
+            redis_conn = redis.Redis(connection_pool=redis_pool)
+        except Exception as e:
+            traceback.print_exc(file=sys.stdout)
+
+    cmd = cmd.upper()
+    if cmd not in ["ADD", "DEL", "LIST", "LS"]:
+        await ctx.send(f'{ctx.author.mention} Invalid cmd given. Available cmd **ADD | DEL | LIST**.')
+        return
+
+    if cmd == "ADD" and len(message) < 10:
+        await ctx.send(f'{ctx.author.mention} Message is too short.')
+        return
+
+    if cmd == "ADD":
+        rndStr = randomString(8).upper()
+        key = "WrkzdBotMsg:" + rndStr
+        redis_conn.set(key, message)
+        await ctx.send(f'{ctx.author.mention} Sucessfully added **{rndStr}** for message: {message}.')
+        return
+    elif cmd == "DEL":
+        key = "WrkzdBotMsg:" + message.upper()
+        if redis_conn and redis_conn.exists(key):
+            redis_conn.delete(key)
+            await ctx.send(f'{ctx.author.mention} **{message.upper()}** message is deleted.')
+            return
+        else:
+            await ctx.send(f'{ctx.author.mention} **{message.upper()}** doesn\'t exist.')
+            return
+    elif cmd == "LS" or cmd == "LIST":
+        keys = redis_conn.keys("WrkzdBotMsg:*")
+        # print(msgs) # [b'WrkzdBotMsg:CLBACSCZ']
+        if len(keys) > 0:
+            response_txt = ''
+            for each in keys:
+                response_txt += "**{}**: {}\n".format(each.decode('utf-8').replace('WrkzdBotMsg:', ''), redis_conn.get(each.decode('utf-8')).decode('utf-8'))
+            await ctx.send(f'{ctx.author.mention} List messages:\n{response_txt}')
+            return
+        else:
+            await ctx.send(f'{ctx.author.mention} There is no message added yet.')
+            return
+
+
 @click.command()
 def main():
+    bot.loop.create_task(posting_tips())
     bot.run(config.discord.token, reconnect=True)
 
 
