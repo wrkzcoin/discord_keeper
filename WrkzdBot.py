@@ -29,7 +29,7 @@ def init():
     redis_pool = redis.ConnectionPool(host='localhost', port=6379, decode_responses=True, db=0)
 
 
-WORD_FILTER = ["libra", "http", "cheap", "buy", "fаcebook", "imgur", "website", "tweet", "twit", ".net", ".com", ".io", ".org", ".gq"]
+WORD_FILTER = ["libra", "http", "cheap", "fаcebook", "imgur", "website", "tweet", "twit", ".net", ".com", ".io", ".org", ".gq"]
 NAME_FILTER = ["_bot", "giveaway", "glveaway", "give_away", "b0t"]
 
 bot = AutoShardedBot(command_prefix=['.', '!', '?'], case_insensitive=True, owner_id = config.discord.ownerID)
