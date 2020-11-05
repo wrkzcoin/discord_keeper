@@ -32,7 +32,11 @@ def init():
 WORD_FILTER = ["libra", "http", "cheap", "fаcebook", "imgur", "website", "tweet", "twit", ".net", ".com", ".io", ".org", ".gq"]
 NAME_FILTER = ["_bot", "giveaway", "glveaway", "give_away", "b0t"]
 
-bot = AutoShardedBot(command_prefix=['.', '!', '?'], case_insensitive=True, owner_id = config.discord.ownerID)
+intents = discord.Intents.default()
+intents.members = True
+intents.presences = True
+
+bot = AutoShardedBot(command_prefix=['.', '!', '?'], case_insensitive=True, owner_id = config.discord.ownerID, intents=intents)
 bot.remove_command("help")
 
 
@@ -52,9 +56,27 @@ async def on_ready():
 
 
 @bot.event
+async def on_member_update(before, after):
+    botLogChan = bot.get_channel(id=config.discord.channelID)
+    if before.nick != after.nick:
+        await botLogChan.send(f'{before.id}: {before.nick} changes **nick** to **{after.nick}**')
+
+
+@bot.event
+async def on_user_update(before, after):
+    botLogChan = bot.get_channel(id=config.discord.channelID)
+    if before.username != after.username:
+        await botLogChan.send(f'{before.id}: {before.username} changes **username** to **{after.username}**')
+
+
+@bot.event
 async def on_message(message):
     global WORD_FILTER
     botLogChan = bot.get_channel(id=config.discord.channelID)
+    # should ignore webhook message
+    if isinstance(message.channel, discord.DMChannel) == False and message.webhook_id:
+        return
+
     if any(word.lower() in message.content.lower() for word in WORD_FILTER):
         try:
             member = message.author
@@ -65,10 +87,10 @@ async def on_message(message):
                 # If just joined and post filtered word
                 try:
                     await message.delete()
-                    to_send = '{0.mention} (`{1.id}`) has been removed from {2.name}! Spammer / Scammer!'.format(member, member, member.guild)
-                    await member.send(to_send)
-                    await member.guild.kick(member)
-                    await botLogChan.send(to_send)
+                    await message.channel.send(f'{message.author.name}#{message.author.discriminator}\'s message contained filtered word(s) while he/she is still new here. {message.author.mention}, please wait for ~ 2 hours until you re mature here.')
+                    # not to kick, just delete message
+                    # await member.guild.kick(member)
+                    await botLogChan.send(f'Deleted {message.author.name}#{message.author.discriminator}\'s message in `#{message.channel.name}`.')
                 except Exception as e:
                     traceback.print_exc(file=sys.stdout)
         except Exception as e:
@@ -131,11 +153,11 @@ async def on_member_join(member):
     try:
         msg = await member.send("{} Please re-act OK in this message within {}s. Otherwise, we will consider you as bot and remove you from {} server. You can re-act also on my public mention message.".format(member.mention, time_out_react, member.guild.name))
         await msg.add_reaction(EMOJI_OK_BOX)
-        msg = await botReactChan.send("{} Please re-act OK in this message within {}s. Otherwise, we will consider you as bot and remove you from {} server. You can also re-act on my DM.".format(member.mention, time_out_react, member.guild.name))
-        await msg.add_reaction(EMOJI_OK_BOX)
     except (discord.Forbidden, discord.errors.Forbidden) as e:
         pass
-    
+    msg = await botReactChan.send("{} Please re-act OK in this message within {}s. Otherwise, we will consider you as bot and remove you from {} server. You can also re-act on my DM.".format(member.mention, time_out_react, member.guild.name))
+    await msg.add_reaction(EMOJI_OK_BOX)
+
     def check(reaction, user):
         return user == member and (reaction.emoji == EMOJI_OK_BOX or reaction.emoji == EMOJI_OK_HAND)and reaction.message.author == bot.user
 
@@ -144,13 +166,13 @@ async def on_member_join(member):
     except asyncio.TimeoutError:
         # get user, they might left or got kicked from spamming before timeout
         get_member = bot.get_user(id=member.id)
-        if get_member:
+        if get_member in member.guild.members and get_member.bot == False:
             to_send = '{0.mention} (`{1.id}`) has been removed from {2.name}! No responding on OK emoji.'.format(member, member, member.guild)
             await botLogChan.send(to_send)
             try:
                 await member.send("You have been removed from {} because of timeout on re-action OK. Sorry for this inconvenience.".format(member.guild.name))
-            except asyncio.TimeoutError:
-                pass
+            except Exception as e:
+                traceback.print_exc(file=sys.stdout)
             await member.guild.kick(member)
     else:
         # check if user re-act
